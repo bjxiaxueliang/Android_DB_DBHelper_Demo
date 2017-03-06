@@ -3,16 +3,13 @@ package com.example.scalephoto.cache;
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
-import android.database.SQLException;
-import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteException;
 import android.text.TextUtils;
 import android.util.Log;
 
-import com.example.scalephoto.cache.utils.SerializeUtil;
 import com.example.scalephoto.cache.db.SnsBiDbContent;
 import com.example.scalephoto.cache.db.SnsBiDbHelper;
 import com.example.scalephoto.cache.models.SnsBiLogData;
+import com.example.scalephoto.cache.utils.SerializeUtil;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +40,16 @@ public class SnsBiDbManager {
 
     //#########################################SnsBiData的增删改查begin##########################################
 
+    private SnsBiDbHelper mSnsBiDbHelper = null;
+
+    private SnsBiDbHelper getSnsBiDbHelper(Context context) {
+        if (mSnsBiDbHelper == null) {
+            mSnsBiDbHelper = new SnsBiDbHelper(context);
+        }
+        return mSnsBiDbHelper;
+    }
+
+
     /**
      * 插入单条数据
      *
@@ -50,7 +57,8 @@ public class SnsBiDbManager {
      * @return
      */
     public synchronized boolean insert(Context context, SnsBiLogData data) {
-        return this.insert(context, SnsBiDbContent.SnsBiTable.TABLE_NAME, objectToMap(data));
+        SnsBiDbHelper mSnsBiDbHelper = getSnsBiDbHelper(context);
+        return mSnsBiDbHelper.insert(SnsBiDbContent.SnsBiTable.TABLE_NAME, objectToMap(data));
     }
 
     /**
@@ -64,13 +72,16 @@ public class SnsBiDbManager {
         if (data == null || data.size() == 0) {
             return false;
         }
+        //-----------------
         ContentValues[] valuesArr = new ContentValues[data.size()];
         //
         for (int i = 0; i < data.size(); i++) {
             ContentValues value = objectToMap(data.get(i));
             valuesArr[i] = value;
         }
-        return this.bulkInsert(context, SnsBiDbContent.SnsBiTable.TABLE_NAME, valuesArr) >= 0;
+        //-------------
+        SnsBiDbHelper mSnsBiDbHelper = getSnsBiDbHelper(context);
+        return mSnsBiDbHelper.bulkInsert(SnsBiDbContent.SnsBiTable.TABLE_NAME, valuesArr) >= 0;
     }
 
     /**
@@ -92,7 +103,9 @@ public class SnsBiDbManager {
         String sql = deleteSql.toString();
         //
         Log.i(TAG, "del sql:" + sql);
-        boolean deleteRet = this.delete(context, SnsBiDbContent.SnsBiTable.TABLE_NAME, sql, null) >= 0;
+        //-------------
+        SnsBiDbHelper mSnsBiDbHelper = getSnsBiDbHelper(context);
+        boolean deleteRet = mSnsBiDbHelper.delete(SnsBiDbContent.SnsBiTable.TABLE_NAME, sql, null) >= 0;
         Log.i(TAG, "del flowers result:" + deleteRet);
         return deleteRet;
     }
@@ -103,7 +116,9 @@ public class SnsBiDbManager {
      * @return
      */
     public synchronized boolean batchDelete(Context context) {
-        boolean deleteRet = this.delete(context, SnsBiDbContent.SnsBiTable.TABLE_NAME, null, null) >= 0;
+        //-------------
+        SnsBiDbHelper mSnsBiDbHelper = getSnsBiDbHelper(context);
+        boolean deleteRet = mSnsBiDbHelper.delete(SnsBiDbContent.SnsBiTable.TABLE_NAME, null, null) >= 0;
         return deleteRet;
     }
 
@@ -115,7 +130,9 @@ public class SnsBiDbManager {
     public synchronized List<SnsBiLogData> query(Context context) {
         List<SnsBiLogData> dataList = null;
         //
-        Cursor cursor = this.query(context, SnsBiDbContent.SnsBiTable.TABLE_NAME, null, null, null, null);
+        //-------------
+        SnsBiDbHelper mSnsBiDbHelper = getSnsBiDbHelper(context);
+        Cursor cursor = mSnsBiDbHelper.query(SnsBiDbContent.SnsBiTable.TABLE_NAME, null, null, null, null);
         //
         try {
             if (cursor != null) {
@@ -174,8 +191,9 @@ public class SnsBiDbManager {
      * @return
      */
     public synchronized int getDataCount(Context context) {
-        //
-        Cursor cursor = this.query(context, SnsBiDbContent.SnsBiTable.TABLE_NAME, null, null, null, null);
+        //-------------
+        SnsBiDbHelper mSnsBiDbHelper = getSnsBiDbHelper(context);
+        Cursor cursor = mSnsBiDbHelper.query(SnsBiDbContent.SnsBiTable.TABLE_NAME, null, null, null, null);
         //
         try {
             if (cursor != null) {
@@ -205,8 +223,9 @@ public class SnsBiDbManager {
         updateSql.append(";");
         //
         String sql = updateSql.toString();
-        //
-        return this.update(context, SnsBiDbContent.SnsBiTable.TABLE_NAME, objectToMap(data), sql, null) > 0;
+        //-------------
+        SnsBiDbHelper mSnsBiDbHelper = getSnsBiDbHelper(context);
+        return mSnsBiDbHelper.update(SnsBiDbContent.SnsBiTable.TABLE_NAME, objectToMap(data), sql, null) > 0;
     }
 
     /**
@@ -228,176 +247,5 @@ public class SnsBiDbManager {
         return value;
     }
 
-    //##################################################################SnsBi 数据库的 增删改查 begin####################################################################
-
-    /**
-     * 插入一条数据
-     *
-     * @param table
-     * @param values
-     * @return
-     */
-    private boolean insert(Context context, String table, ContentValues values) {
-        Log.i(TAG, "Insert data to flash DB. table:" + table);
-        if (values == null || TextUtils.isEmpty(table)) {
-            return false;
-        }
-        //
-        SQLiteDatabase db = this.getSnsBiDb(context);
-        if (db == null) {
-            return false;
-        }
-        try {
-            return db.insert(table, null, values) >= 0;
-        } catch (Exception e) {
-            Log.e(TAG, "Insert data to client fail!", e);
-            return true;
-        }
-    }
-
-
-    private Cursor query(Context context, String table, String[] projection,
-                         String selection, String[] selectionArgs, String sortOrder) {
-        Log.i(TAG, "Query data from flash DB. table:" + table);
-        if (TextUtils.isEmpty(table)) {
-            return null;
-        }
-        //
-        SQLiteDatabase db = this.getSnsBiDb(context);
-        if (db == null) {
-            return null;
-        }
-        Cursor queryResult = null;
-        try {
-            queryResult = db.query(table, projection, selection, selectionArgs,
-                    null, null, sortOrder);
-        } catch (IllegalArgumentException e) {
-            Log.e(TAG, "Query SQL error:" + e.getMessage(), e);
-        } catch (SQLiteException e) {
-            Log.e(TAG, "Query database error!", e);
-        } catch (SQLException e) {
-            Log.e(TAG, "Query fail!", e);
-        }
-        return queryResult;
-    }
-
-
-    /**
-     * Batch insert new data.
-     */
-    private int bulkInsert(Context context, String table, ContentValues[] values) {
-        Log.i(TAG, "Batch insert data to flash DB. table:" + table);
-        if (values == null || TextUtils.isEmpty(table)) {
-            return -1;
-        }
-        //
-        SQLiteDatabase db = this.getSnsBiDb(context);
-        if (db == null) {
-            return -1;
-        }
-        int numValues = values.length;
-        try {
-            // start transaction
-            db.beginTransaction();
-            try {
-                for (int i = 0; i < numValues; i++) {
-                    if (values[i] != null) {
-                        db.insert(table, null, values[i]);
-                    }
-                }
-                // Marks the current transaction as successful
-                db.setTransactionSuccessful();
-            } finally {
-                // Commit or rollback by flag of transaction
-                db.endTransaction();
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "BulkUpdate fail! table: " + table, e);
-            return -1;
-        }
-        return numValues;
-    }
-
-    /**
-     * 删除
-     *
-     * @param table
-     * @param selection
-     * @param selectionArgs
-     * @return
-     */
-    private int delete(Context context, String table, String selection,
-                       String[] selectionArgs) {
-        Log.i(TAG, "Delete data on flash DB. table:" + table);
-        if (TextUtils.isEmpty(table)) {
-            return -1;
-        }
-        //
-        SQLiteDatabase db = this.getSnsBiDb(context);
-        if (db == null) {
-            return -1;
-        }
-        try {
-            return db.delete(table, selection, selectionArgs);
-        } catch (SQLException e) {
-            Log.e(this.getClass().toString(), "Delete fail!", e);
-            return -1;
-        }
-    }
-
-    /**
-     * 更新
-     *
-     * @param table
-     * @param values
-     * @param selection
-     * @param selectionArgs
-     * @return
-     */
-    private int update(Context context, String table, ContentValues values,
-                       String selection, String[] selectionArgs) {
-        int result = 0;
-        Log.i(TAG, "Update data on flash DB. table:" + table);
-        if (TextUtils.isEmpty(table)) {
-            return -1;
-        }
-        //
-        SQLiteDatabase db = this.getSnsBiDb(context);
-        if (db == null) {
-            return -1;
-        }
-        if (values == null && selection != null) {
-            // execute a SQL
-            db.execSQL(selection);
-            return 1;
-        } else if (values == null) {
-            return -1;
-        } else {
-            result = db.update(table, values, selection, selectionArgs);
-        }
-        return result;
-    }
-
-    // db helper
-    private SnsBiDbHelper mSnsBiDbHelper;
-
-    /**
-     * Get instance of SQLiteDatabase,deal with exception
-     *
-     * @return
-     */
-    private SQLiteDatabase getSnsBiDb(Context context) {
-        SQLiteDatabase db = null;
-        try {
-            if (mSnsBiDbHelper == null) {
-                mSnsBiDbHelper = new SnsBiDbHelper(context);
-            }
-            db = mSnsBiDbHelper.getWritableDatabase();
-        } catch (Exception e) {
-            e.printStackTrace();
-            Log.e(TAG, "Get db fail!", e);
-        }
-        return db;
-    }
 
 }

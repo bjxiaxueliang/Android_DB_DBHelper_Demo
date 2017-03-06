@@ -19,6 +19,7 @@ public class SnsBiLogData implements Serializable {
     public Object data;// data	object	具体事件的参数
 
 
+
     @Override
     public String toString() {
         StringBuffer sb = new StringBuffer();
