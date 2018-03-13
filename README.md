@@ -1,0 +1,2 @@
+# Android_DB_DBHelper_Demo
+SQLiteOpenHelper使用举例，采用Serializable将复杂对象序列化到数据库
